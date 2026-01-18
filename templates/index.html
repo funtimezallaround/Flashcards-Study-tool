@@ -10,33 +10,92 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: 'var(--primary)',
+                        secondary: 'var(--secondary)',
+                        bgDark: 'var(--bg-dark)',
+                        bgCard: 'var(--bg-card)',
+                        bgCardHover: 'var(--bg-card-hover)',
+                        textLight: 'var(--text-light)',
+                        textGray: 'var(--text-gray)',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Montserrat', 'sans-serif'],
+                    }
+                }
+            }
+        }
+        window.initialTitle = "{{ current_user.title if current_user.title else 'My Flashcards' }}";
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap');
+
+        :root {
+            /* Earthy Palette - Dark (Default) */
+            --primary: #d4a373;      /* Tan / Wood color */
+            --secondary: #606c38;    /* Olive / Sage Green */
+            --bg-dark: #1a1c1a;      /* Deep Peat / Dark Charcoal */
+            --bg-card: #2c302c;      /* Opaque Dark Green */
+            --bg-card-hover: #3c413c;
+            --text-light: #fefae0;   /* Cream / Off-white */
+            --text-gray: #b7b7a4;    /* Muted Sage Gray */
+            --glass-border: 1px solid rgba(212, 163, 115, 0.15);
+        }
+
+        /* Light Mode Palette */
+        [data-theme="light"] {
+            --bg-dark: #fefae0;
+            --bg-card: #e9edc9;     /* Opaque Light Green */
+            --bg-card-hover: #d4dba3;
+            --text-light: #283618;
+            --text-gray: #606c38;
+            --glass-border: 1px solid rgba(96, 108, 56, 0.2);
+        }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            transition: background-color 0.3s ease, color 0.3s ease;
             overscroll-behavior-y: none;
         }
 
+        h1, h2, h3 {
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(circle at 15% 50%, rgba(96, 108, 56, 0.15) 0%, transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(212, 163, 115, 0.1) 0%, transparent 25%);
+            pointer-events: none;
+        }
+
+        /* Card 3D styles */
         .perspective-1000 { perspective: 1000px; }
         .transform-style-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
-        .no-select {
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-        }
+        .no-select { user-select: none; -webkit-user-select: none; }
+        
         .card-content::-webkit-scrollbar { width: 6px; }
-        .card-content::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-        .card-content::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
-        .card-content::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        .card-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+        .card-content::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 4px; }
+        .card-content::-webkit-scrollbar-thumb:hover { background: var(--primary); }
     </style>
 </head>
 
 <body>
+    <div class="bg-animation"></div>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -46,11 +105,24 @@
         const FlashcardApp = () => {
             const [cards, setCards] = useState([]);
             const [currentIndex, setCurrentIndex] = useState(0);
+            const [inputValue, setInputValue] = useState(1);
             const [isFlipped, setIsFlipped] = useState(false);
             const [isGenerating, setIsGenerating] = useState(false);
             const [isLoading, setIsLoading] = useState(true);
             const [showAddModal, setShowAddModal] = useState(false);
+            const [showEditModal, setShowEditModal] = useState(false);
             const [newCard, setNewCard] = useState({ category: '', front: '', back: '' });
+            const [editingCard, setEditingCard] = useState(null);
+
+            // Topic State
+            const [topics, setTopics] = useState([]);
+            const [currentTopic, setCurrentTopic] = useState(null);
+            const [showTopicModal, setShowTopicModal] = useState(false);
+
+            // Title State
+            const [appTitle, setAppTitle] = useState(window.initialTitle || "My Flashcards");
+            const [isEditingTitle, setIsEditingTitle] = useState(false);
+            const [tempTitle, setTempTitle] = useState(appTitle);
 
             // Animation States
             const [animationState, setAnimationState] = useState('idle');
@@ -66,15 +138,89 @@
             const transitionDuration = 300;
 
             useEffect(() => {
-                fetchCards();
-            }, []);
+                const handleKeyDown = (e) => {
+                    // Prevent shortcuts when typing
+                    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+                    if (isEditingTitle || showAddModal || showEditModal) return;
+                    
+                    if (e.key === 'ArrowRight') handleNext();
+                    if (e.key === 'ArrowLeft') handlePrev();
+                    if (e.key === ' ') handleFlip();
+                };
 
-            const fetchCards = async () => {
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [isEditingTitle, showAddModal, showEditModal, cards.length, animationState, isAnimating]);
+
+            useEffect(() => {
+                const init = async () => {
+                    // Fetch topics first to know ability to match saved ID
+                    try {
+                        const res = await fetch('/api/topics');
+                        if (res.ok) {
+                            const allTopics = await res.json();
+                            setTopics(allTopics);
+
+                            // Helper to find topic in nested structure
+                            const findTopic = (list, id) => {
+                                for(const t of list) {
+                                    if (t.id.toString() === id.toString()) return t;
+                                    if (t.children && t.children.length) {
+                                        const found = findTopic(t.children, id);
+                                        if(found) return found;
+                                    }
+                                }
+                                return null;
+                            };
+
+                            const savedTopicId = localStorage.getItem('currentTopicId');
+                            let initialTopic = null;
+                            if (savedTopicId) {
+                                initialTopic = findTopic(allTopics, savedTopicId);
+                            }
+
+                            if (initialTopic) {
+                                setCurrentTopic(initialTopic);
+                                setAppTitle(initialTopic.name);
+                                fetchCards(initialTopic.id);
+                            } else {
+                                if (savedTopicId) localStorage.removeItem('currentTopicId');
+                                fetchCards();
+                            }
+                        } else {
+                             // Fallback if topics fail
+                             fetchCards();
+                        }
+                    } catch(err) {
+                        console.error("Init error:", err);
+                        fetchCards();
+                    }
+                };
+                init();
+            }, []);
+            
+            useEffect(() => {
+                setInputValue(currentIndex + 1);
+            }, [currentIndex]);
+
+            const fetchTopics = async () => {
                 try {
-                    const res = await fetch('/api/cards');
+                    const res = await fetch('/api/topics');
+                    if (res.ok) setTopics(await res.json());
+                } catch(err) { console.error(err); }
+            };
+
+            const fetchCards = async (topicId) => {
+                setIsLoading(true);
+                try {
+                    let url = '/api/cards';
+                    if (topicId) url += `?topic_id=${topicId}`;
+                    
+                    const res = await fetch(url);
                     if (res.ok) {
                         const data = await res.json();
                         setCards(data);
+                        setCurrentIndex(0);
                     }
                 } catch (err) {
                     console.error("Error fetching cards:", err);
@@ -83,18 +229,33 @@
                 }
             };
 
+            const handleTopicSelect = (topic) => {
+                setCurrentTopic(topic);
+                setAppTitle(topic ? topic.name : "My Flashcards");
+                setShowTopicModal(false);
+                fetchCards(topic ? topic.id : null);
+                
+                if (topic) {
+                    localStorage.setItem('currentTopicId', topic.id.toString());
+                } else {
+                    localStorage.removeItem('currentTopicId');
+                }
+            };
+
             const addCard = async (e) => {
                 e.preventDefault();
                 try {
+                    const payload = { ...newCard };
+                    if (currentTopic) payload.topic_id = currentTopic.id;
+                    
                     const res = await fetch('/api/cards', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(newCard)
+                        body: JSON.stringify(payload)
                     });
                     if (res.ok) {
                         const added = await res.json();
-                        // Refresh cards or add to local state
-                        fetchCards();
+                        fetchCards(currentTopic ? currentTopic.id : null);
                         setShowAddModal(false);
                         setNewCard({ category: '', front: '', back: '' });
                     }
@@ -103,6 +264,30 @@
                 }
             };
 
+            const handleEditClick = () => {
+                if (!currentCard) return;
+                setEditingCard({ ...currentCard });
+                setShowEditModal(true);
+            };
+
+            const saveEditCard = async (e) => {
+                e.preventDefault();
+                try {
+                     const res = await fetch(`/api/cards/${editingCard.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(editingCard)
+                    });
+                    if (res.ok) {
+                        fetchCards(); // easy refresh
+                        setShowEditModal(false);
+                        setEditingCard(null);
+                    }
+                } catch(err) {
+                    alert("Failed to update card");
+                }
+            };
+            
             const deleteCurrentCard = async () => {
                  if (!currentCard) return;
                  if (confirm("Are you sure you want to delete this card?")) {
@@ -125,47 +310,16 @@
             }
 
             const currentCard = cards[currentIndex];
+            const nextIndex = (currentIndex + 1) % cards.length;
+            const nextCard = cards[nextIndex];
 
-            const handleNext = () => {
-                if (isAnimating || cards.length === 0) return;
-                setIsAnimating(true);
-                setAnimationState('exiting-left');
-                setTimeout(() => {
-                    setCurrentIndex((prev) => (prev + 1) % cards.length);
-                    setIsFlipped(false);
-                    setAnimationState('entering-from-right');
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            setAnimationState('idle');
-                            setTimeout(() => setIsAnimating(false), transitionDuration);
-                        });
-                    });
-                }, transitionDuration);
-            };
-
-            const handlePrev = () => {
-                if (isAnimating || cards.length === 0) return;
-                setIsAnimating(true);
-                setAnimationState('exiting-right');
-                setTimeout(() => {
-                    setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
-                    setIsFlipped(false);
-                    setAnimationState('entering-from-left');
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            setAnimationState('idle');
-                            setTimeout(() => setIsAnimating(false), transitionDuration);
-                        });
-                    });
-                }, transitionDuration);
-            };
 
             const handleFlip = () => {
-                if (!isAnimating && cards.length > 0) setIsFlipped(!isFlipped);
+                if (!isAnimating && cards.length > 0 && !isEditingTitle) setIsFlipped(!isFlipped);
             };
 
             const handleCardClick = () => {
-                if (!swipeRef.current && !isAnimating) {
+                if (!swipeRef.current && !isAnimating && !isEditingTitle) {
                     handleFlip();
                 }
                 swipeRef.current = false;
@@ -173,6 +327,7 @@
 
             // Touch handlers same as before...
             const onTouchStart = (e) => {
+                if (isEditingTitle) return;
                 setTouchEnd(null);
                 setTouchStart({ x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY });
                 swipeRef.current = false;
@@ -204,12 +359,36 @@
                 fileInputRef.current.click();
             };
 
+            const handleTitleSave = async () => {
+                if (!tempTitle.trim()) return;
+                try {
+                const res = await fetch('/api/user/title', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: tempTitle })
+                });
+                if (res.ok) {
+                    setAppTitle(tempTitle);
+                    setIsEditingTitle(false);
+                } else {
+                    alert('Failed to save title');
+                }
+                } catch (err) {
+                console.error(err);
+                alert('Error processing request');
+                }
+            };
+
             const handleFileChange = async (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
 
                 const formData = new FormData();
                 formData.append('file', file);
+                
+                if (currentTopic) {
+                    formData.append('topic_id', currentTopic.id);
+                }
 
                 try {
                     const res = await fetch('/api/cards/import', {
@@ -253,11 +432,24 @@
                     if (isAnimating) return;
                     if (e.key === 'ArrowRight') handleNext();
                     if (e.key === 'ArrowLeft') handlePrev();
-                    if (e.key === ' ' || e.key === 'Enter') handleFlip();
+                    if (e.key === ' ') handleFlip();
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [cards.length, isAnimating]);
+
+            const handleInputKeyDown = (e) => {
+                if (e.key === 'Enter') {
+                    const val = parseInt(inputValue);
+                    if (!isNaN(val) && val >= 1 && val <= cards.length) {
+                         setCurrentIndex(val - 1);
+                         setIsFlipped(false);
+                         e.target.blur();
+                    } else {
+                         setInputValue(currentIndex + 1);
+                    }
+                }
+            };
 
             const ChevronLeft = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>;
             const ChevronRight = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
@@ -266,53 +458,142 @@
             const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
             const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
             const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+            const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+            const SettingsIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
+
 
 
             const getCategoryColor = (cat) => {
-                if (!cat) return 'bg-gray-100 text-gray-800 border-gray-200';
-                if (cat.toLowerCase().includes('algorithm')) return 'bg-purple-100 text-purple-800 border-purple-200';
-                if (cat.toLowerCase().includes('concept')) return 'bg-blue-100 text-blue-800 border-blue-200';
-                if (cat.toLowerCase().includes('ml types')) return 'bg-orange-100 text-orange-800 border-orange-200';
-                return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                if (!cat) return 'bg-white/10 text-textGray border-white/10';
+                const c = cat.toLowerCase();
+                if (c.includes('algorithm')) return 'bg-purple-500/20 text-purple-200 border-purple-500/30';
+                if (c.includes('concept')) return 'bg-blue-500/20 text-blue-200 border-blue-500/30';
+                if (c.includes('ml types')) return 'bg-orange-500/20 text-orange-200 border-orange-500/30';
+                return 'bg-green-500/20 text-green-200 border-green-500/30';
             };
 
-            const getCardTransformClass = () => {
-                const base = "transition-all duration-300 ease-in-out";
-                switch (animationState) {
-                    case 'exiting-left': return `${base} -translate-x-[120%] opacity-0 scale-90 rotate-[-10deg]`;
-                    case 'exiting-right': return `${base} translate-x-[120%] opacity-0 scale-90 rotate-[10deg]`;
-                    case 'entering-from-right': return `translate-x-[120%] opacity-0 scale-90`;
-                    case 'entering-from-left': return `-translate-x-[120%] opacity-0 scale-90`;
-                    case 'idle': return `${base} translate-x-0 opacity-100 scale-100 rotate-0`;
-                    default: return base;
+            const getCardTransformClass = (isCurrent) => {
+                const baseCommon = "absolute top-0 left-0 w-full h-full ease-in-out";
+                
+                if (isCurrent) {
+                    const with3d = `${baseCommon} transform-style-3d`;
+                    switch (animationState) {
+                         case 'exiting-left': 
+                             return `${with3d} transition-all duration-300 -translate-x-[120%] opacity-0 scale-90 rotate-[-10deg] z-20`;
+                         case 'exiting-right': 
+                             return `${with3d} transition-all duration-300 translate-x-[120%] opacity-0 scale-90 rotate-[10deg] z-20`;
+                         
+                         case 'entering-from-right': 
+                             return `${with3d} duration-0 translate-x-0 scale-[0.96] opacity-100 rotate-0 z-20`;
+                         case 'entering-from-left': 
+                             return `${with3d} duration-0 -translate-x-[120%] scale-90 opacity-0 rotate-[-10deg] z-20`;
+                         
+                         case 'prev-swap-start':
+                             return `${with3d} duration-0 -translate-x-[120%] scale-100 opacity-100 rotate-0 z-20`;
+
+                         case 'idle': 
+                             return `${with3d} transition-all duration-300 translate-x-0 opacity-100 scale-100 rotate-0 z-20`;
+                         default: 
+                             return `${with3d} transition-all duration-300 translate-x-0 opacity-100 scale-100 rotate-0 z-20`;
+                    }
+                } else {
+                    if (animationState === 'prev-swap-start') {
+                         return `${baseCommon} duration-0 translate-x-0 scale-100 opacity-100 rotate-0 z-10`;
+                    }
+                    return `${baseCommon} transition-all duration-300 translate-x-0 scale-[0.96] opacity-100 rotate-0 z-10`; 
                 }
             };
+            
+            const handleNext = () => {
+                if (isAnimating || cards.length === 0 || isEditingTitle) return;
+                setIsAnimating(true);
+                setAnimationState('exiting-left');
+                setTimeout(() => {
+                    setCurrentIndex((prev) => (prev + 1) % cards.length);
+                    setIsFlipped(false);
+                    setAnimationState('entering-from-right');
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            setAnimationState('idle');
+                            setTimeout(() => setIsAnimating(false), transitionDuration);
+                        });
+                    });
+                }, transitionDuration);
+            };
 
-            if (isLoading) {
-                 return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading cards...</div>;
-            }
+            const handlePrev = () => {
+                if (isAnimating || cards.length === 0 || isEditingTitle) return;
+                setIsAnimating(true);
+                
+                // Swap content immediately
+                setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
+                setIsFlipped(false);
+                setAnimationState('prev-swap-start');
+                
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        setAnimationState('idle');
+                        setTimeout(() => setIsAnimating(false), transitionDuration);
+                    });
+                });
+            };
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-4">
-                    <div className="absolute top-4 right-4 text-sm text-gray-600">
-                         <a href="/logout" className="hover:text-red-500">Logout</a>
+                    <div className="absolute top-4 right-4 text-sm text-textGray flex gap-5">
+                         <a href="/account" className="flex items-center gap-2 hover:text-primary transition-colors">
+                            <span className="hidden sm:inline">Account</span> <SettingsIcon className="w-4 h-4"/>
+                         </a>
+                         <a href="/logout" className="hover:text-primary transition-colors">Logout</a>
                     </div>
 
-                    <div className="w-full max-w-2xl mb-8 text-center mt-8">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-2">My Flashcards</h1>
-                        <p className="text-gray-600 flex items-center justify-center gap-2">
-                            <span>Tap or Swipe ↕ to flip</span>
-                            <span className="text-gray-300">•</span>
-                            <span>Swipe ↔ to navigate</span>
+                    <div className="w-full max-w-2xl mb-12 text-center mt-8">
+                        {isEditingTitle ? (
+                            <div className="flex items-center justify-center gap-2 mb-4">
+                                <input 
+                                    type="text" 
+                                    value={tempTitle}
+                                    onChange={(e) => setTempTitle(e.target.value)}
+                                    className="text-4xl lg:text-5xl font-bold bg-transparent border-b border-primary text-textLight focus:outline-none font-display tracking-tight text-center w-full max-w-lg"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                        if(e.key === 'Enter') handleTitleSave();
+                                        if(e.key === 'Escape') {
+                                            setIsEditingTitle(false);
+                                            setTempTitle(appTitle);
+                                        }
+                                    }}
+                                />
+                                <button onClick={handleTitleSave} className="text-secondary hover:text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+                            </div>
+                        ) : (
+                            <div className="group relative inline-block mb-4">
+                                <button 
+                                    className="text-4xl lg:text-5xl font-bold text-textLight font-display tracking-tight cursor-pointer hover:text-primary transition-colors inline-flex items-center gap-3 bg-transparent border-none p-0"
+                                    onClick={() => setShowTopicModal(true)}
+                                >
+                                    {appTitle}
+                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/10 p-2 rounded-full">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                    </span>
+                                </button>
+                                <div className="text-xs text-textGray uppercase tracking-widest mt-1 font-bold">Current Topic</div>
+                            </div>
+                        )}
+                        <p className="text-textGray flex items-center justify-center gap-3 text-sm font-medium tracking-wide uppercase">
+                            <span>Tap to Flip</span>
+                            <span className="text-primary">•</span>
+                            <span>Swipe to Navigate</span>
                         </p>
                     </div>
 
                     {cards.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500 bg-white rounded-xl shadow border border-gray-200 mb-8">
-                            <p className="mb-4">No cards yet! Create one to get started.</p>
+                        <div className="p-12 text-center text-textGray bg-bgCard rounded-sm border border-white/10 mb-8 backdrop-blur-md">
+                            <p className="mb-6 text-lg">No cards yet! Create one to start your journey.</p>
                             <button 
                                 onClick={() => setShowAddModal(true)}
-                                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                className="px-6 py-3 bg-primary text-bgDark font-bold rounded hover:bg-[#e6cba5] transition-all uppercase tracking-wider"
                             >
                                 Create First Card
                             </button>
@@ -326,34 +607,56 @@
                             onTouchEnd={onTouchEnd}
                             style={{ touchAction: 'none' }}
                         >
-                            <div className="absolute top-0 left-0 w-full h-full bg-white rounded-2xl border border-gray-200 shadow-sm transform translate-y-6 translate-x-4 rotate-2 scale-[0.92] -z-20 opacity-40 transition-all duration-300"></div>
-                            <div className="absolute top-0 left-0 w-full h-full bg-white rounded-2xl border border-gray-200 shadow-sm transform translate-y-3 translate-x-2 rotate-1 scale-[0.96] -z-10 opacity-70 transition-all duration-300"></div>
+                            <div className="absolute top-0 left-0 w-full h-full bg-bgCard rounded border border-white/5 shadow-2xl transform translate-y-6 translate-x-4 rotate-2 scale-[0.92] -z-20 opacity-30 transition-all duration-300"></div>
+                            <div className="absolute top-0 left-0 w-full h-full bg-bgCard rounded border border-white/5 shadow-2xl transform translate-y-3 translate-x-2 rotate-1 scale-[0.96] -z-10 opacity-60 transition-all duration-300"></div>
 
-                            <div className={`w-full h-full transform-style-3d ${getCardTransformClass()}`}>
+                            {/* Background Card (Simulating "Next" card sitting behind) */}
+                             <div className={`w-full h-full ${getCardTransformClass(false)}`}>
+                                <div className="relative w-full h-full bg-bgCard rounded border border-white/10 shadow-xl flex flex-col overflow-hidden">
+                                     <div className="h-1 w-full bg-gradient-to-r from-primary to-secondary opacity-30"></div>
+                                      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                                         {nextCard && (
+                                            <>
+                                                <span className={`px-3 py-1 rounded-sm text-xs font-bold uppercase tracking-widest mb-6 border ${getCategoryColor(nextCard.category)} opacity-50`}>
+                                                    {nextCard.category}
+                                                </span>
+                                                <h2 className="text-2xl font-bold text-textGray/50 font-display leading-relaxed">
+                                                    {nextCard.front}
+                                                </h2>
+                                                <p className="mt-8 text-xs text-textGray/30 font-bold uppercase tracking-widest">Tap to Flip</p>
+                                            </>
+                                         )}
+                                      </div>
+                                </div>
+                             </div>
+
+                             {/* Current Card */}
+                            <div className={`w-full h-full ${getCardTransformClass(true)}`}>
                                 <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
-                                    <div className="absolute w-full h-full backface-hidden bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col overflow-hidden">
-                                        <div className="h-2 w-full bg-gradient-to-r from-blue-500 to-purple-600"></div>
+                                    <div className="absolute w-full h-full backface-hidden bg-bgCard rounded border border-white/10 shadow-2xl flex flex-col overflow-hidden hover:border-primary/30 transition-colors">
+
+                                        <div className="h-1 w-full bg-gradient-to-r from-primary to-secondary"></div>
                                         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                                             {currentCard && (
                                                 <>
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold mb-6 border ${getCategoryColor(currentCard.category)}`}>
+                                                    <span className={`px-3 py-1 rounded-sm text-xs font-bold uppercase tracking-widest mb-6 border ${getCategoryColor(currentCard.category)}`}>
                                                         {currentCard.category}
                                                     </span>
-                                                    <h2 className="text-2xl font-semibold text-gray-800 leading-relaxed">
+                                                    <h2 className="text-2xl font-bold text-textLight font-display leading-relaxed">
                                                         {currentCard.front}
                                                     </h2>
                                                 </>
                                             )}
-                                            <p className="mt-8 text-sm text-gray-400 font-medium uppercase tracking-wider">Tap to Flip</p>
+                                            <p className="mt-8 text-xs text-secondary font-bold uppercase tracking-widest">Tap to Flip</p>
                                         </div>
                                     </div>
 
-                                    <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col overflow-hidden">
-                                        <div className="h-2 w-full bg-gradient-to-r from-purple-600 to-blue-500"></div>
+                                    <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-bgCard rounded border border-white/10 shadow-2xl flex flex-col overflow-hidden">
+                                        <div className="h-1 w-full bg-gradient-to-r from-secondary to-primary"></div>
                                         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center card-content overflow-y-auto">
-                                            <span className="text-sm text-gray-400 font-medium uppercase tracking-wider mb-4">Answer</span>
+                                            <span className="text-xs text-primary font-bold uppercase tracking-widest mb-4">Answer</span>
                                             {currentCard && (
-                                                <p className="text-xl text-gray-700 leading-relaxed whitespace-pre-line">
+                                                <p className="text-xl text-textLight leading-relaxed whitespace-pre-line">
                                                     {currentCard.back}
                                                 </p>
                                             )}
@@ -367,84 +670,194 @@
                     {/* Controls */}
                     {cards.length > 0 && (
                         <div className="flex items-center gap-6 mt-4">
-                            <button onClick={(e) => { e.stopPropagation(); handlePrev(); }} disabled={isAnimating} className="p-3 rounded-full bg-white shadow-md hover:bg-gray-50 text-gray-700 transition-transform active:scale-95 border border-gray-200">
+                            <button onClick={(e) => { e.stopPropagation(); handlePrev(); }} disabled={isAnimating} className="p-3 rounded-full bg-bgCard shadow-lg hover:border-primary text-textLight transition-all active:scale-95 border border-white/10">
                                 <ChevronLeft />
                             </button>
-                            <div className="text-gray-500 font-medium font-mono">
-                                {currentIndex + 1} / {cards.length}
+                            <div className="flex items-center gap-2 text-textGray font-bold font-mono">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max={cards.length}
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    onKeyDown={handleInputKeyDown}
+                                    onBlur={() => setInputValue(currentIndex + 1)}
+                                    className="w-12 text-center bg-transparent border-b border-white/20 focus:border-primary focus:outline-none text-textLight"
+                                />
+                                <span className="text-textGray/50">/ {cards.length}</span>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); handleNext(); }} disabled={isAnimating} className="p-3 rounded-full bg-white shadow-md hover:bg-gray-50 text-gray-700 transition-transform active:scale-95 border border-gray-200">
+                            <button onClick={(e) => { e.stopPropagation(); handleNext(); }} disabled={isAnimating} className="p-3 rounded-full bg-bgCard shadow-lg hover:border-primary text-textLight transition-all active:scale-95 border border-white/10">
                                 <ChevronRight />
                             </button>
                         </div>
                     )}
 
                     {/* Actions */}
-                    <div className="flex flex-wrap justify-center gap-4 mt-8 w-full max-w-xl">
-                        <button onClick={() => setShowAddModal(true)} disabled={isGenerating || isAnimating} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-semibold hover:from-green-600 hover:to-emerald-700 transition-all shadow-md active:scale-95">
+                    <div className="flex flex-wrap justify-center gap-3 mt-12 w-full max-w-xl">
+                        <button onClick={() => setShowAddModal(true)} disabled={isGenerating || isAnimating} className="flex items-center gap-2 px-5 py-2.5 rounded bg-primary text-bgDark text-sm font-bold uppercase tracking-wider hover:bg-[#e6cba5] transition-all shadow-md active:scale-95">
                             <PlusIcon /> Add Card
-                        </button>
-
-                        <input 
-                            type="file" 
-                            accept=".json" 
-                            ref={fileInputRef} 
-                            style={{ display: 'none' }} 
-                            onChange={handleFileChange} 
-                        />
-                        <button onClick={handleImportClick} disabled={isGenerating || isAnimating} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-all shadow-md active:scale-95">
-                           <UploadIcon /> Import JSON
                         </button>
 
                         {cards.length > 0 && (
                             <>
-                                <button onClick={handleShuffle} disabled={isAnimating} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm">
+                                <button onClick={handleShuffle} disabled={isAnimating} className="flex items-center gap-2 px-4 py-2 rounded bg-bgCard border border-white/10 text-textGray text-sm font-bold uppercase tracking-wider hover:text-primary transition-colors shadow-sm">
                                     <ShuffleIcon /> Shuffle
                                 </button>
-                                <button onClick={deleteCurrentCard} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors shadow-sm">
+                                <button onClick={handleEditClick} disabled={isAnimating} className="flex items-center gap-2 px-4 py-2 rounded bg-bgCard border border-white/10 text-secondary text-sm font-bold uppercase tracking-wider hover:border-secondary transition-colors shadow-sm">
+                                    <EditIcon /> Modify
+                                </button>
+                                <button onClick={deleteCurrentCard} className="flex items-center gap-2 px-4 py-2 rounded bg-bgCard border border-white/10 text-red-400 text-sm font-bold uppercase tracking-wider hover:border-red-500 hover:text-red-300 transition-colors shadow-sm">
                                     <TrashIcon /> Delete
                                 </button>
                             </>
                         )}
                     </div>
 
+                    {/* Topic Selection Modal */}
+                    {showTopicModal && (
+                        <div className="fixed inset-0 bg-[#1a1c1a]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-bgCard rounded border border-white/10 shadow-2xl p-6 w-full max-w-md max-h-[80vh] flex flex-col">
+                                <h3 className="text-xl font-bold mb-6 text-textLight font-display uppercase tracking-wide flex justify-between items-center">
+                                    Select Topic
+                                    <button onClick={() => setShowTopicModal(false)} className="text-textGray hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                                </h3>
+                                
+                                <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-2">
+                                    {/* Recursive Topic Renderer */}
+                                    {(() => {
+                                        const renderTopic = (topic, level = 0) => (
+                                            <div key={topic.id}>
+                                                <button 
+                                                    onClick={() => handleTopicSelect(topic)}
+                                                    className={`w-full text-left p-4 rounded border transition-all mb-2 ${
+                                                        currentTopic && currentTopic.id === topic.id 
+                                                        ? 'bg-primary text-bgDark border-primary font-bold' 
+                                                        : 'bg-white/5 border-white/5 text-textLight hover:bg-white/10'
+                                                    }`}
+                                                    style={{ marginLeft: `${level * 20}px`, width: `calc(100% - ${level * 20}px)` }}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {level > 0 && <span className="opacity-30">↳</span>}
+                                                        <div className="font-bold">{topic.name}</div>
+                                                    </div>
+                                                </button>
+                                                {/* Render Children */}
+                                                {topics.filter(t => t.parent_id === topic.id).map(child => renderTopic(child, level + 1))}
+                                            </div>
+                                        );
+                                        
+                                        // Render Root Topics (parent_id is null)
+                                        return topics.filter(t => !t.parent_id).map(t => renderTopic(t));
+                                    })()}
+                                    
+                                    {topics.length === 0 && (
+                                        <div className="text-center text-textGray py-8 italic">
+                                            No topics found.<br/>
+                                            <a href="/account" className="text-primary hover:underline not-italic font-bold mt-2 inline-block">Manage Topics</a>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-white/10 text-center">
+                                     <a href="/account" className="text-xs text-primary font-bold uppercase tracking-widest hover:underline">Manage Topics in Account</a>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Modal */}
-                    {showAddModal && (
-                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-                                <h3 className="text-xl font-bold mb-4">Add New Card</h3>
-                                <form onSubmit={addCard}>
+                    {showEditModal && editingCard && (
+                        <div className="fixed inset-0 bg-[#1a1c1a]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-bgCard rounded border border-white/10 shadow-2xl p-6 w-full max-w-md">
+                                <h3 className="text-xl font-bold mb-6 text-textLight font-display uppercase tracking-wide">Edit Card</h3>
+                                <form onSubmit={saveEditCard}>
                                     <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                        <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Category</label>
                                         <input 
                                             type="text" 
-                                            className="w-full border rounded-lg p-2" 
+                                            className="w-full bg-bgDark border border-white/10 rounded p-3 text-textLight focus:border-primary focus:outline-none transition-colors"
+                                            value={editingCard.category} 
+                                            onChange={e => setEditingCard({...editingCard, category: e.target.value})}
+                                            required 
+                                        />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Front (Question)</label>
+                                        <textarea 
+                                            className="w-full bg-bgDark border border-white/10 rounded p-3 text-textLight focus:border-primary focus:outline-none h-24 transition-colors resize-none"
+                                            value={editingCard.front} 
+                                            onChange={e => setEditingCard({...editingCard, front: e.target.value})}
+                                            required 
+                                        />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Back (Answer)</label>
+                                        <textarea 
+                                            className="w-full bg-bgDark border border-white/10 rounded p-3 text-textLight focus:border-primary focus:outline-none h-24 transition-colors resize-none"
+                                            value={editingCard.back} 
+                                            onChange={e => setEditingCard({...editingCard, back: e.target.value})}
+                                            required 
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 justify-end mt-6">
+                                        <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-textGray hover:text-textLight hover:bg-white/5 rounded transition-colors uppercase text-sm font-bold tracking-wider">Cancel</button>
+                                        <button type="submit" className="px-6 py-2 bg-primary text-bgDark rounded hover:bg-[#e6cba5] transition-colors uppercase text-sm font-bold tracking-wider">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-[#1a1c1a]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-bgCard rounded border border-white/10 shadow-2xl p-6 w-full max-w-md">
+                                <h3 className="text-xl font-bold mb-6 text-textLight font-display uppercase tracking-wide">Add New Card</h3>
+                                <form onSubmit={addCard}>
+                                    <div className="mb-4">
+                                        <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Category</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full bg-bgDark border border-white/10 rounded p-3 text-textLight focus:border-primary focus:outline-none transition-colors"
                                             value={newCard.category} 
                                             onChange={e => setNewCard({...newCard, category: e.target.value})}
                                             required 
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Front (Question)</label>
+                                        <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Front (Question)</label>
                                         <textarea 
-                                            className="w-full border rounded-lg p-2 h-24" 
+                                            className="w-full bg-bgDark border border-white/10 rounded p-3 text-textLight focus:border-primary focus:outline-none h-24 transition-colors resize-none"
                                             value={newCard.front} 
                                             onChange={e => setNewCard({...newCard, front: e.target.value})}
                                             required 
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Back (Answer)</label>
+                                        <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Back (Answer)</label>
                                         <textarea 
-                                            className="w-full border rounded-lg p-2 h-24" 
+                                            className="w-full bg-bgDark border border-white/10 rounded p-3 text-textLight focus:border-primary focus:outline-none h-24 transition-colors resize-none"
                                             value={newCard.back} 
                                             onChange={e => setNewCard({...newCard, back: e.target.value})}
                                             required 
                                         />
                                     </div>
-                                    <div className="flex gap-2 justify-end">
-                                        <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Card</button>
+                                    <div className="flex gap-3 justify-end mt-6">
+                                        <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 text-textGray hover:text-textLight hover:bg-white/5 rounded transition-colors uppercase text-sm font-bold tracking-wider">Cancel</button>
+                                        <button type="submit" className="px-6 py-2 bg-primary text-bgDark rounded hover:bg-[#e6cba5] transition-colors uppercase text-sm font-bold tracking-wider">Add Card</button>
+                                    </div>
+                                    
+                                    <div className="mt-6 pt-6 border-t border-white/10 text-center">
+                                         <p className="text-xs text-textGray mb-4">OR IMPORT FROM JSON</p>
+                                         <input 
+                                            type="file" 
+                                            accept=".json" 
+                                            ref={fileInputRef} 
+                                            style={{ display: 'none' }} 
+                                            onChange={handleFileChange} 
+                                        />
+                                         <button type="button" onClick={handleImportClick} className="flex items-center justify-center gap-2 w-full px-5 py-2.5 rounded bg-bgCard border border-white/10 text-textLight text-sm font-bold uppercase tracking-wider hover:border-secondary transition-all shadow-md active:scale-95">
+                                            <UploadIcon /> Import JSON File
+                                        </button>
                                     </div>
                                 </form>
                             </div>

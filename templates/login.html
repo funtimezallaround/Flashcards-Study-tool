@@ -3,35 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Flashcards</title>
+    <title>Login - Concept Learning</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            /* Earthy Dark Theme Palette */
+            --bg-dark: #1e1e1e;          /* Deep Peat/Charcoal Background */
+            --bg-card: #2c302c;          /* Dark Olive/Charcoal Card Surface */
+            --primary: #d4b483;          /* Warm Sand/Tan Accent */
+            --secondary: #a3b18a;        /* Sage Green Secondary */
+            --text-light: #e3e5e3;       /* Off-white Text */
+            --text-gray: #a0a0a0;        /* Muted Text */
+            --success: #a3b18a;
+            --error: #c65f57;            /* Muted Brick Red */
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .input-field {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-light);
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(212, 180, 131, 0.2);
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: var(--bg-dark);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #e6cba5;
+            transform: translateY(-1px);
+        }
+
+        .card-surface {
+            background-color: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-md w-96">
-        <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Login</h2>
-        {% with messages = get_flashed_messages(category_filter=["error"]) %}
+<body class="p-4">
+
+    <div class="w-full max-w-md card-surface rounded-xl p-8 backdrop-blur-sm">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold tracking-tight text-[var(--primary)] mb-2">Welcome Back</h1>
+            <p class="text-[var(--text-gray)]">Sign in to your learning space</p>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-                    {{ messages[0] }}
+                <div class="mb-6 space-y-2">
+                    {% for message in messages %}
+                        <div class="p-3 rounded bg-[var(--error)]/20 border border-[var(--error)]/30 text-[var(--error)] text-sm text-center">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
                 </div>
             {% endif %}
         {% endwith %}
-        <form method="POST">
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Username</label>
-                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" name="username" type="text" placeholder="Username" required>
+
+        <form method="POST" action="{{ url_for('login') }}" class="space-y-6">
+            <div>
+                <label for="username" class="block text-xs uppercase font-bold tracking-wider text-[var(--text-gray)] mb-2">Username</label>
+                <input type="text" id="username" name="username" required 
+                       class="input-field w-full px-4 py-3 rounded-lg placeholder-white/20"
+                       placeholder="Enter your username">
             </div>
-            <div class="mb-6">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Password</label>
-                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="password" name="password" type="password" placeholder="******************" required>
+
+            <div>
+                <label for="password" class="block text-xs uppercase font-bold tracking-wider text-[var(--text-gray)] mb-2">Password</label>
+                <input type="password" id="password" name="password" required 
+                       class="input-field w-full px-4 py-3 rounded-lg placeholder-white/20"
+                       placeholder="Enter your password">
             </div>
-            <div class="flex items-center justify-between">
-                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full" type="submit">
-                    Sign In
-                </button>
-            </div>
-             <p class="text-center mt-4 text-sm text-gray-600">Don't have an account? <a href="{{ url_for('register') }}" class="text-blue-500 hover:text-blue-800">Register</a></p>
+
+            <button type="submit" class="btn-primary w-full py-3.5 rounded-lg shadow-lg">
+                Sign In
+            </button>
         </form>
+
+        <div class="mt-8 text-center text-sm">
+            <p class="text-[var(--text-gray)]">Don't have an account? 
+                <a href="{{ url_for('register') }}" class="text-[var(--primary)] hover:underline font-semibold ml-1">Create one</a>
+            </p>
+        </div>
     </div>
+
 </body>
 </html>

@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account - Concept Learning</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            /* Earthy Dark Theme Palette */
+            --bg-dark: #1e1e1e;
+            --bg-card: #2c302c;
+            --primary: #d4b483;
+            --secondary: #a3b18a;
+            --text-light: #e3e5e3;
+            --text-gray: #a0a0a0;
+            --success: #a3b18a;
+            --error: #c65f57;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+        }
+
+        .input-field {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-light);
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(212, 180, 131, 0.2);
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: var(--bg-dark);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #e6cba5;
+            transform: translateY(-1px);
+        }
+
+        .card-surface {
+            background-color: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 flex flex-col items-center">
+
+    <div class="w-full max-w-2xl">
+        
+        <div class="flex items-center justify-between mb-8">
+            <h1 class="text-3xl font-bold tracking-tight text-[var(--primary)]">Account Settings</h1>
+            <a href="{{ url_for('index') }}" class="flex items-center gap-2 text-[var(--text-gray)] hover:text-[var(--primary)] transition-colors text-sm font-bold uppercase tracking-wider">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Review
+            </a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mb-6 space-y-2">
+                    {% for category, message in messages %}
+                        <div class="p-3 rounded border text-sm text-center
+                                    {% if category == 'error' %} bg-[var(--error)]/20 border-[var(--error)]/30 text-[var(--error)]
+                                    {% else %} bg-[var(--success)]/20 border-[var(--success)]/30 text-[var(--success)] {% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Profile Section -->
+        <div class="card-surface rounded-xl p-8 mb-6">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <i data-lucide="user" class="text-[var(--primary)]"></i> Profile
+            </h2>
+            <form method="POST" class="space-y-6">
+                <input type="hidden" name="action" value="update_profile">
+                <div>
+                    <label class="block text-xs uppercase font-bold tracking-wider text-[var(--text-gray)] mb-2">Username</label>
+                    <div class="flex gap-4">
+                        <input type="text" name="username" value="{{ current_user.username }}" required 
+                               class="input-field flex-grow px-4 py-3 rounded-lg placeholder-white/20">
+                        <button type="submit" class="btn-primary px-6 py-3 rounded-lg shadow-lg whitespace-nowrap">
+                            Update
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Security Section -->
+        <div class="card-surface rounded-xl p-8 mb-6">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <i data-lucide="lock" class="text-[var(--primary)]"></i> Security
+            </h2>
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="action" value="update_password">
+                
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs uppercase font-bold tracking-wider text-[var(--text-gray)] mb-2">Current Password</label>
+                        <input type="password" name="current_password" required 
+                               class="input-field w-full px-4 py-3 rounded-lg placeholder-white/20">
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase font-bold tracking-wider text-[var(--text-gray)] mb-2">New Password</label>
+                        <input type="password" name="new_password" required 
+                               class="input-field w-full px-4 py-3 rounded-lg placeholder-white/20">
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase font-bold tracking-wider text-[var(--text-gray)] mb-2">Confirm Password</label>
+                        <input type="password" name="confirm_password" required 
+                               class="input-field w-full px-4 py-3 rounded-lg placeholder-white/20">
+                    </div>
+                </div>
+                
+                <div class="pt-4 flex justify-end">
+                    <button type="submit" class="btn-primary w-full md:w-auto px-8 py-3 rounded-lg shadow-lg">
+                        Change Password
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Topic Management Section -->
+        <div class="card-surface rounded-xl p-8 mb-6">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <i data-lucide="folder" class="text-[var(--primary)]"></i> Topic Management
+            </h2>
+            
+            <!-- Create Topic -->
+            <div class="mb-6">
+                <label class="block text-xs uppercase font-bold tracking-wider text-[var(--text-gray)] mb-2">Create New Topic</label>
+                <div class="flex gap-4">
+                    <input type="text" id="newTopicName" placeholder="e.g. History, Math, Exam 1" 
+                           class="input-field flex-grow px-4 py-3 rounded-lg placeholder-white/20">
+                    <button onclick="createTopic()" class="btn-primary px-6 py-3 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Add
+                    </button>
+                </div>
+            </div>
+
+            <!-- Topic List -->
+            <div class="space-y-3" id="topicList">
+                <!-- Topics will be loaded here -->
+                <div class="text-[var(--text-gray)] italic text-sm text-center py-4">Loading topics...</div>
+            </div>
+            
+            <p class="text-xs text-[var(--text-gray)] mt-4 text-center">
+                Flashcards without a topic are stored in "My Flashcards" automatically.
+            </p>
+        </div>
+
+        <!-- Data Section -->
+        <div class="card-surface rounded-xl p-8">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <i data-lucide="database" class="text-[var(--primary)]"></i> Data Management
+            </h2>
+            <div class="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                <div>
+                    <h3 class="font-bold text-[var(--text-light)]">Export Flashcards</h3>
+                    <p class="text-sm text-[var(--text-gray)]">Download all your cards as a JSON file.</p>
+                </div>
+                <a href="{{ url_for('export_cards') }}" class="btn-primary px-6 py-2.5 rounded text-sm flex items-center gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i> Export
+                </a>
+            </div>
+            
+            <div class="mt-6 pt-6 border-t border-white/5">
+                <a href="{{ url_for('logout') }}" class="flex items-center justify-center gap-2 w-full px-4 py-3 rounded bg-[var(--error)]/10 text-[var(--error)] hover:bg-[var(--error)]/20 transition-colors font-bold uppercase text-sm tracking-wider border border-[var(--error)]/20">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Topic Manager Modal -->
+    <div id="topicManagerModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl max-h-[85vh] rounded-xl border border-white/10 shadow-2xl flex flex-col bg-[#2c302c] overflow-hidden">
+            <div class="p-6 border-b border-white/5 flex justify-between items-center bg-[#2c302c] z-10 shrink-0">
+                <h3 class="text-xl font-bold text-[var(--primary)] flex items-center gap-2 min-w-0">
+                    <i data-lucide="layers" class="w-5 h-5 shrink-0"></i>
+                    <span id="modalTopicTitle" class="truncate">Manage Topic</span>
+                </h3>
+                <button onclick="closeTopicModal()" class="text-[var(--text-gray)] hover:text-white transition-colors shrink-0 ml-4">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 space-y-8 bg-[#2c302c]">
+                 <!-- Add Cards Section -->
+                 <div class="space-y-3">
+                    <h4 class="text-xs uppercase font-bold text-[var(--text-gray)] tracking-wider flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Unassigned Cards
+                    </h4>
+                    <div id="unassignedCardsList" class="max-h-48 overflow-y-auto border border-white/5 rounded-lg p-2 space-y-1 bg-black/20 custom-scrollbar">
+                         <div class="text-sm text-center text-[var(--text-gray)] italic py-2">Loading possible candidates...</div>
+                    </div>
+                 </div>
+
+                 <!-- Current Cards Section -->
+                 <div class="space-y-3">
+                    <h4 class="text-xs uppercase font-bold text-[var(--text-gray)] tracking-wider flex items-center gap-2">
+                        <i data-lucide="list" class="w-4 h-4"></i> Cards in Topic (<span id="cardCount">0</span>)
+                    </h4>
+                    <div id="currentCardsList" class="space-y-2">
+                         <!-- Cards go here -->
+                    </div>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        let sortable;
+        let currentModalTopicId = null;
+        let allTopics = [];
+
+        // Topic Management Logic
+        document.addEventListener('DOMContentLoaded', fetchTopics);
+
+        async function fetchTopics() {
+            const listEl = document.getElementById('topicList');
+            try {
+                const res = await fetch('/api/topics');
+                allTopics = await res.json();
+                
+                if (allTopics.length === 0) {
+                    listEl.innerHTML = '<div class="text-[var(--text-gray)] italic text-sm text-center py-4">No topics found.</div>';
+                    return;
+                }
+
+                // Recursive function to build the tree HTML
+                function buildTree(topics, parentId = null, level = 0) {
+                    const children = topics.filter(t => t.parent_id === parentId);
+                    
+                    // Sorting happens by backend (Topic.order), assumed correct
+                    // No wrapper div here, just return the items html
+                    return children.map(topic => {
+                        return `
+                        <div class="relative pl-${level * 6}" data-id="${topic.id}" data-parent="${topic.parent_id || 'null'}">
+                            <div class="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5 group relative transition-colors hover:border-white/10 ${topic.name === 'My Flashcards' ? 'border-[var(--primary)]/30 bg-[var(--primary)]/5' : ''}">
+                                <div class="cursor-grab hover:text-[var(--primary)] text-[var(--text-gray)] flex items-center px-1 handle">
+                                    <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                                </div>
+                                
+                                <div class="flex-grow flex items-center gap-3">
+                                    <button onclick="openTopicManager(${topic.id}, '${topic.name.replace(/'/g, "\\'")}')" 
+                                            class="text-[var(--primary)] hover:text-white transition-colors" title="Manage Cards">
+                                        <i data-lucide="${topic.name === 'My Flashcards' ? 'archive' : 'folder-open'}" class="w-5 h-5"></i>
+                                    </button>
+                                    <input type="text" value="${topic.name}" id="topic-name-${topic.id}"
+                                        class="bg-transparent border-none text-[var(--text-light)] w-full focus:outline-none focus:ring-0 font-medium"
+                                        onblur="updateTopic(${topic.id}, this.value)"
+                                        onkeypress="if(event.key === 'Enter') this.blur()">
+                                </div>
+                                <div class="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                    <button onclick="document.getElementById('topic-name-${topic.id}').focus()" 
+                                            class="p-2 hover:bg-white/10 rounded text-[var(--text-gray)] hover:text-[var(--primary)] transition-colors" title="Rename">
+                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="deleteTopic(${topic.id})" 
+                                            class="p-2 hover:bg-[var(--error)]/20 rounded text-[var(--text-gray)] hover:text-[var(--error)] transition-colors" title="Delete">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Nested container -->
+                            <div class="ml-8 mt-2 nested-sortable min-h-[5px]" id="children-${topic.id}">
+                                ${buildTree(topics, topic.id, level + 1)}
+                            </div>
+                        </div>
+                    `}).join('');
+                }
+
+                listEl.innerHTML = `<div id="children-root" class="space-y-2 nested-sortable" data-parent="root">
+                    ${buildTree(allTopics, null, 0)}
+                </div>`;
+                
+                lucide.createIcons();
+                initSortables();
+
+            } catch (err) {
+                console.error(err);
+                listEl.innerHTML = '<div class="text-[var(--error)] text-sm text-center">Failed to load topics.</div>';
+            }
+        }
+
+        function initSortables() {
+            // Initialize all sortable lists (root + nested)
+            document.querySelectorAll('.nested-sortable').forEach(el => {
+                createSortable(el);
+            });
+        }
+
+        function createSortable(el) {
+            new Sortable(el, {
+                group: 'nested-topics', // Allow dragging between lists
+                animation: 150,
+                handle: '.handle',
+                ghostClass: 'bg-white/10',
+                fallbackOnBody: true,
+                swapThreshold: 0.65,
+                onEnd: async function(evt) {
+                    const itemEl = evt.item;
+                    const newParentStr = evt.to.id.replace('children-', '');
+                    
+                    // 'root' or empty implies null parent
+                    const parentId = (newParentStr === 'root' || newParentStr === 'topicList' || newParentStr === '') 
+                                     ? null 
+                                     : parseInt(newParentStr);
+                    
+                    // Collect all siblings in new list to update order
+                    const siblings = Array.from(evt.to.children).map((child, index) => ({
+                        id: parseInt(child.dataset.id),
+                        order: index,
+                        parent_id: parentId
+                    }));
+
+                    await saveTopicOrder(siblings);
+                    // Refresh the entire tree to fix indentation classes (e.g. pl-12 -> pl-0)
+                    fetchTopics(); 
+                }
+            });
+        }
+
+        async function saveTopicOrder(order) {
+            try {
+                await fetch('/api/topics/reorder', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(order)
+                });
+            } catch (err) {
+                console.error('Failed to save order', err);
+            }
+        }
+
+        async function createTopic() {
+            const input = document.getElementById('newTopicName');
+            const name = input.value.trim();
+            if (!name) return;
+
+            try {
+                const res = await fetch('/api/topics', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name })
+                });
+                
+                if (res.ok) {
+                    input.value = '';
+                    fetchTopics();
+                } else {
+                    alert('Failed to create topic');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function updateTopic(id, name) {
+            if (!name.trim()) return fetchTopics(); // Revert if empty
+            
+            try {
+                await fetch(`/api/topics/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name })
+                });
+            } catch (err) {
+                console.error(err);
+                alert('Failed to update topic');
+            }
+        }
+
+        async function deleteTopic(id) {
+            if (!confirm('Are you sure? This will delete all flashcards in this topic.')) return;
+            
+            try {
+                const res = await fetch(`/api/topics/${id}`, { method: 'DELETE' });
+                if (res.ok) fetchTopics();
+                else alert('Failed to delete topic');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // --- Modal Logic ---
+
+        function closeTopicModal() {
+            document.getElementById('topicManagerModal').classList.add('hidden');
+        }
+
+        async function openTopicManager(id, name) {
+            currentModalTopicId = id;
+            document.getElementById('modalTopicTitle').innerText = name;
+            document.getElementById('topicManagerModal').classList.remove('hidden');
+            
+            refreshModalContent();
+        }
+
+        async function refreshModalContent() {
+            if(!currentModalTopicId) return;
+
+            // 1. Fetch Cards in Topic
+            const cardsRes = await fetch(`/api/cards?topic_id=${currentModalTopicId}`);
+            const cards = await cardsRes.json();
+            
+            document.getElementById('cardCount').innerText = cards.length;
+            const currentList = document.getElementById('currentCardsList');
+
+            if(cards.length === 0) {
+                currentList.innerHTML = '<div class="text-[var(--text-gray)] italic text-sm p-4 text-center border border-white/5 rounded-lg bg-black/20">No cards in this topic.</div>';
+            } else {
+                currentList.innerHTML = cards.map(card => `
+                    <div class="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
+                        <div class="flex-grow min-w-0">
+                            <div class="font-bold text-sm truncate text-[#d4b483]">${card.front}</div>
+                            <div class="text-xs text-[var(--text-gray)] truncate">${card.back}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select onchange="moveCard(${card.id}, this.value)" class="text-xs bg-black/40 text-[var(--text-gray)] border border-white/10 rounded p-1.5 focus:outline-none focus:border-[var(--primary)] max-w-[100px] sm:max-w-[120px]">
+                                <option value="" disabled selected class="bg-[#2c302c] text-[var(--text-light)]">Move...</option>
+                                <option value="null" class="bg-[#2c302c] text-[var(--text-light)]">Unassign</option>
+                                ${allTopics.filter(t => t.id !== currentModalTopicId).map(t => `<option value="${t.id}" class="bg-[#2c302c] text-[var(--text-light)]">${t.name}</option>`).join('')}
+                            </select>
+                            <button onclick="deleteCard(${card.id})" class="p-1.5 text-[var(--text-gray)] hover:text-[var(--error)] bg-black/20 rounded hover:bg-[var(--error)]/20 transition-colors shrink-0" title="Delete Card">
+                                <i data-lucide="trash" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // 2. Fetch Unassigned Cards (My Flashcards)
+            // Fetch ONLY cards that are in "My Flashcards" topic or have no topic
+            // We pass nothing to get_cards, but we rely on the backend now to be strict if no topic_id is provided.
+            // Alternatively, we can assume the backend handles it.
+            
+            const unassignedRes = await fetch('/api/cards'); // Now safely returns only default/unassigned
+            const unassignedCards = await unassignedRes.json();
+            
+            const unassignedList = document.getElementById('unassignedCardsList');
+            
+            // Remove any potential duplicates if backend logic is loose (though it shouldn't be now)
+            // And ensure we don't show cards that are somehow in the current topic (unlikely but safe)
+            const validCandidates = unassignedCards.filter(c => c.topic_id !== currentModalTopicId);
+
+            if(validCandidates.length === 0) {
+                 unassignedList.innerHTML = '<div class="text-[var(--text-gray)] italic text-sm text-center py-2">No unassigned cards found.</div>';
+            } else {
+                 unassignedList.innerHTML = validCandidates.map(card => `
+                    <div class="flex items-center justify-between p-2 hover:bg-white/5 rounded transition-colors group">
+                        <div class="truncate text-xs text-[var(--text-gray)] w-2/3">${card.front}</div>
+                        <button onclick="moveCard(${card.id}, ${currentModalTopicId})" class="text-xs bg-[var(--primary)] text-[var(--bg-dark)] px-3 py-1 rounded font-bold hover:bg-[#e6cba5] transition-colors">
+                            ADD
+                        </button>
+                    </div>
+                 `).join('');
+            }
+            
+            lucide.createIcons();
+        }
+
+        async function moveCard(cardId, targetTopicId) {
+             const payload = { 
+                 topic_id: targetTopicId === 'null' ? null : parseInt(targetTopicId) 
+             };
+             
+             try {
+                const res = await fetch(`/api/cards/${cardId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if(res.ok) {
+                    refreshModalContent();
+                } else {
+                    alert('Failed to move card');
+                }
+             } catch(err) {
+                 console.error(err);
+                 alert('Error moving card');
+             }
+        }
+        
+        async function deleteCard(cardId) {
+            if(!confirm("Permanently delete this card?")) return;
+            try {
+                await fetch(`/api/cards/${cardId}`, { method: 'DELETE' });
+                refreshModalContent();
+            } catch(e) { console.error(e); }
+        }
+
+    </script>
+</body>
+</html>
