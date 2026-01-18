@@ -11,6 +11,7 @@ venv.bak/
 *.db
 *.sqlite
 *.json
+logs/
 
 # Python
 __pycache__/
