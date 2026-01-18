@@ -10,6 +10,7 @@ venv.bak/
 # Database
 *.db
 *.sqlite
+*.json
 
 # Python
 __pycache__/
